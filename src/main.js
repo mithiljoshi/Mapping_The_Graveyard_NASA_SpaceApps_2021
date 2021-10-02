@@ -8,6 +8,8 @@ import getPosition from "./positioning";
 import OrbitCalculation from "./orbitCalculation";
 import useInterval from "react-useinterval";
 import moment from 'moment';
+import PopUp from "./popup";
+import PredictComponent from "./predict";
 //moment(Date);
 
 function MainApp(props) {
@@ -19,6 +21,9 @@ function MainApp(props) {
   const [isLoaded, setLoaded] = useState(false);
   const placemarkRef = useRef(null);
   const orbitRef = useRef(null);
+  const [popUpLatitude,setPopUpLatitude]=useState(null);
+  const [popUpLongitude,setPopUpLongitude]=useState(null);
+  const [popUpAltitude,setPopUpAltitude]=useState(null);
   useInterval(() => {
     var newDate=new Date();
     setTime(newDate);
@@ -26,7 +31,7 @@ function MainApp(props) {
   useEffect(() => {
     console.log(selectedID);
     if (selectedID !== null) {
-      console.log("If");
+      //console.log("If");
       orbitRef.current.removeAllRenderables();
       var placemarks = OrbitCalculation(selectedID, time);
       orbitRef.current.addRenderable(placemarks);
@@ -153,8 +158,76 @@ function MainApp(props) {
       }
     });
   }, []);
+  useInterval(() => {
+    if (isLoaded) {
+      placemarkRef.current.removeAllRenderables();
+      if (selectedClass !== null) {
+        var name = selectedClass.split(" ");
+        for (var j = 0; j < name.length; j++) {
+          name[j] = name[j].toLowerCase();
+        }
+        var s = "";
+        for (j = 0; j < name.length; j++) {
+          s += name[j];
+        }
+        fetch(
+          "http://localhost:3000/" +
+            s +
+            "/" +
+            time.getFullYear().toString() +
+            "/" +
+            time.getMonth().toString() +
+            "/" +
+            time.getDate().toString() +
+            "/" +
+            time.getHours().toString() +
+            "/" +
+            time.getMinutes().toString() +
+            "/" +
+            time.getSeconds().toString()
+        )
+          .then(async (res) => {
+            var data = await res.json();
+            var list = data.data;
+            var ans = [];
+            for (var i = 0; i < list.length; i++) {
+              var point = Plotter(
+                list[i]["latitude"],
+                list[i]["longitude"],
+                list[i]["altitude"] * 1000,
+                list[i]["id"]
+              );
+              if(list[i]["id"]===selectedID){
+                setPopUpAltitude(list[i]["altitude"])
+                setPopUpLatitude(list[i]["latitude"])
+                setPopUpLongitude(list[i]["longitude"]);
+              }
+              ans.push(point);
+            }
+            placemarkRef.current.addRenderables(ans);
+            console.log("Hi");
+            windowRef.current.redraw();
+          })
+          .catch((err) => console.log(err));
+      }
+    }
+    //get new position from date
+    //remove all marks
+    //put new position
+  }, 3000);
+  useInterval(() => {
+    if (selectedClass) {
+      window.sessionStorage.setItem("selectedClass", selectedClass);
+      if (selectedID) {
+        window.sessionStorage.setItem("selectedID", selectedID);
+      }
+    }
+    window.location.reload(true);
+  }, 4 * 60 * 1000);
   return (
     <div>
+      <PopUp selectedClass={selectedClass} selectedID={selectedID} latitude={popUpLatitude} longitude={popUpLongitude} altitude={popUpAltitude}/>
+      <PredictComponent selectedClass={selectedClass} selectedID={selectedID}/>
       <div style={{ display: "flex", width: "auto" }}>
         <div
           style={{
